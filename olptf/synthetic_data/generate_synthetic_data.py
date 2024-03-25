@@ -148,10 +148,11 @@ def generate_dict_of_jnp(
     data = {
         "dates": dates,
         "vol": vol,
-        "covariance_factor": F,
+        "covariance_factors": F,
         "residual_variance": D,
         "predictor": predictor,
         "quad_cost": quad_cost,
+        "turnover": turnover,
         "rets": rets,
         "beta": beta,
         "aum": aum,
