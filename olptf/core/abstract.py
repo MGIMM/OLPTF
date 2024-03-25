@@ -4,14 +4,18 @@ from typing import Any
 import os
 import pickle
 
+
 def save(obj, path):
     dirname = os.path.abspath(os.path.dirname(path))
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     with open(path, "wb") as file:
         pickle.dump(obj, file)
+
+
 def load(path):
     pickle.load(open(path, "rb"))
+
 
 @dataclass
 class Entity:
@@ -22,14 +26,16 @@ class Entity:
     def attrs(self):
         return self.attrs_
 
+
 @dataclass
 class Base(Entity, ABC):
     def __post_init__(self):
         super().__post_init__()
-    
+
     @classmethod
     def __init_subclass__(cls, *args, **kwargs):
         super().__init_subclass__(*args, **kwargs)
+
 
 @dataclass
 class AbstractAgent(Base):
@@ -38,21 +44,18 @@ class AbstractAgent(Base):
         """obs -> agent -> action"""
         ...
 
+
 @dataclass
 class AbstractEnv(Base):
     @abstractmethod
-    def observation(self) -> Any:    
-        ...
+    def observation(self) -> Any: ...
 
     @abstractmethod
-    def step(self) -> Any:    
-        ...
+    def step(self) -> Any: ...
 
     @property
     @abstractmethod
-    def state(self):
-        ...
+    def state(self): ...
 
     @abstractmethod
-    def update(self):    
-        ...
+    def update(self): ...
