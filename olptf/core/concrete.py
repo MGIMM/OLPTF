@@ -1,29 +1,109 @@
-from abc import abstractmethod
+import os
+import pickle
 from dataclasses import dataclass
-from typing import Any, List
+from typing import List, Dict
+from collections.abc import Iterable
 from .abstract import AbstractAgent, AbstractEnv
-import inspect
-
-BASE_FIELDS = [
-    "attrs_",
-    "act",
-    "abc_impl",
-    "attrs",
-]
 
 
 @dataclass
 class Agent(AbstractAgent):
     def __post_init__(self):
         super().__post_init__()
-        for attr_ in self.__dir__():
-            if not attr_.endswith("_") and attr_ not in BASE_FIELDS:
-                self.attrs.update({attr_: self.__getattribute__(attr_)})
+        self._obs = dict()
+        self._input_keys = set()
+        self._effective_input_keys = set()
+        self._output_keys = set()
+        self._label = self.__repr__()
+        self.update_attrs()
 
-    def __call__(self, obs):
-        return self.act(obs) if obs is not None else None
+    def __init_subclass__(cls, keys=None, **kwargs):
+        """allow input_keys initialization when creating the class.
 
-    def act(self, obs) -> Any: ...
+        Args:
+            keys (list or set, optional): input_keys of Agent. Defaults to None.
+        """
+        super().__init_subclass__(**kwargs)
+        if keys is not None:
+            cls.input_keys = set(keys)
+
+    def __call__(self, state):
+        """warpper of observe and action.
+
+        Args:
+            state (dict): state of the env.
+
+        Returns:
+            action (dict): action dict.
+        """
+        if state is not None:
+            self.obs = state
+            action = self.act()
+        else:
+            action = None
+        if action is not None:
+            assert isinstance(action, dict), f"action of {self.label} should be a dict."
+            self.output_keys = set(action.keys())
+        return action
+
+    def act(self) -> Dict:
+        ...
+
+    @property
+    def input_keys(self):
+        return self._input_keys
+
+    @input_keys.setter
+    def input_keys(self, keys):
+        if not isinstance(keys, set):
+            keys = set(keys)
+        self._input_keys = keys
+        self.update_attrs()
+
+    @property
+    def effective_input_keys(self):
+        return self._effective_input_keys
+
+    @effective_input_keys.setter
+    def effective_input_keys(self, keys):
+        if not isinstance(keys, set):
+            keys = set(keys)
+        self._effective_input_keys = keys
+        self.update_attrs()
+
+    @property
+    def output_keys(self):
+        return self._output_keys
+
+    @output_keys.setter
+    def output_keys(self, keys):
+        if not isinstance(keys, set):
+            keys = set(keys)
+        self._output_keys = keys
+        self.update_attrs()
+
+    @property
+    def obs(self):
+        return self._obs
+
+    @obs.setter
+    def obs(self, state):
+        self.effective_input_keys = set()
+        assert isinstance(state, dict), "state should be a dict."
+        for k in self.input_keys:
+            if k in state.keys():
+                self.effective_input_keys.update({k})
+        self._obs.update({k: state[k] for k in self.effective_input_keys})
+        self.update_attrs()
+
+    @property
+    def label(self):
+        return self._label
+
+    @label.setter
+    def label(self, label):
+        assert isinstance(label, str), "label should be a str."
+        self._label = label
 
 
 @dataclass
@@ -33,111 +113,83 @@ class PipelineAgent(Agent):
     def __post_init__(self):
         super().__post_init__()
         self.flatten_agents()
+        self.input_keys = set()
+        for agent_ in self.agents:
+            self.input_keys.update(agent_.input_keys)
 
     def flatten_agents(self):
-        agents_ = list()
+        _agents = list()
         for agent in self.agents:
             if hasattr(agent, "agents"):
                 for agent_ in agent.agents:
-                    agents_.append(agent_)
+                    _agents.append(agent_)
                     self.attrs.update({agent_.__class__.__name__: agent_.attrs})
             else:
-                agent_.append(agent)
-        self.agents = agents_
+                _agents.append(agent)
+        self.agents = _agents
 
-    def act(self, obs):
+    def act(self):
         actions = dict()
         for agent in self.agents:
-            action = agent(obs)
+            action = agent(self.obs)
             if action is not None:
-                obs.update(action)
+                self.obs.update(action)
                 actions.update(action)
         return actions
 
 
 @dataclass
 class Env(AbstractEnv):
-    data_stream: Any = None
+    stream: Iterable = None
+    init_state: Dict = None
 
     def __post_init__(self):
         super().__post_init__()
-        if self.data_stream is not None:
-            self.iter_ = iter(self.data_stream)
-        self.state_ = {}
+        if self.stream is not None:
+            self._iter = iter(self.stream)
+        self._state = self.init_state or dict()
 
-    def observation(self):
-        if self.data_stream is not None:
-            data = next(self.iter_)
+    def update_stream(self):
+        if self.stream is not None:
+            data = next(self._iter)
             self.state.update(data)
         return self.state
 
     def step(self):
         try:
-            obs = self.observation()
+            _state = self.update_stream()
             done = False
         except StopIteration:
-            obs = None
+            _state = None
             done = True
-        return obs, done
+        return _state, done
 
     @property
     def state(self):
-        return self.state_
+        return self._state
 
-    def update(self, action):
+    def interaction(self, action):
         if action is not None:
             self.state.update(action)
 
 
-# function-agent wrapper
-@dataclass
-class WrapperAgent(Agent):
-    f: Any
-    params: dict
-    defaults: dict
-
-    def __post_init__(self):
-        self.input_keys = set()
-        self.output_keys = set()
-        super().__post_init__()
-
-    def update_keys(self, input_keys, output_keys=None):
-        self.input_keys = set(input_keys)
-        if output_keys is not None:
-            self.output_keys = set(output_keys)
-
-    def act(self, obs):
-        effective_obs = {k: obs[k] for k in self.input_keys}
-        effective_signature = {**effective_obs, **self.params}
-        return self.f(**effective_signature)
-
-
-def make_agent(f, params, input_keys=None, output_keys=None):
-    params_list_ = set()
-    input_keys_ = set()
-    signature_ = inspect.signature(f)
-    for p in signature_.parameters:
-        if str(p) not in input_keys:
-            params_list_.update({p})
-        else:
-            input_keys_.update({p})
-    default_params_ = {
-        k: v.default
-        for k, v in signature_.parameters.items()
-        if v.default is not inspect.Parameter.empty and k not in input_keys_
-    }
-    agent = WrapperAgent(
-        f=f,
-        params=params,
-        defaults=default_params_,
-    )
-    agent.update_keys(input_keys=input_keys, output_keys=output_keys)
-    return agent
-
-
+# online dynamic
 def train(agent, env):
     done = False
     while not done:
-        obs, done = env.step()
-        action = agent(obs)
-        env.update(action)
+        state, done = env.step()
+        action = agent(state)
+        env.interaction(action)
+
+
+# debugging
+def save(obj, path):
+    dirname = os.path.abspath(os.path.dirname(path))
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    with open(path, "wb") as file:
+        pickle.dump(obj, file)
+
+
+def load(path):
+    pickle.load(open(path, "rb"))

@@ -1,4 +1,4 @@
-from AbstractOnlineStructure.concrete import (
+from olptf.core.concrete import (
     Env,
     Agent,
     PipelineAgent,
@@ -11,8 +11,8 @@ from dataclasses import dataclass
 class AddNum(Agent):
     num:int
 
-    def act(self, obs):
-        a = obs.get("a",1.)
+    def act(self):
+        a = self.obs.get("a",1.)
         action = dict(a=a+self.num)
         return action
 
@@ -33,3 +33,4 @@ def test_pipeline_agent():
     agent = PipelineAgent([add3, add5])
     env = Env(data_stream())
     train(agent, env)
+

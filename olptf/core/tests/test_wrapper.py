@@ -1,4 +1,4 @@
-from olptf.core.concrete import (
+from olptf.core.wrapper import (
     make_agent,
 )
 
