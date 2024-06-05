@@ -1,36 +1,53 @@
-from olptf.core.concrete import (
+from ..concrete import (
     Env,
     Agent,
     PipelineAgent,
     train,
 )
-
 from dataclasses import dataclass
 
+
 @dataclass
-class AddNum(Agent):
-    num:int
+class LinearOperation(Agent, keys=["x", "theta"]):
+    intercept: float
 
     def act(self):
-        a = self.obs.get("a",1.)
-        action = dict(a=a+self.num)
+        x = self.obs["x"]
+        # default value for a data key in the flow
+        theta = self.obs.get("theta", 1.0)
+        action = dict(x=x * theta + self.intercept)
         return action
+
+
+def test_agent():
+    add3 = LinearOperation(intercept=3)
+    state = {"x": 1.0}
+    action = add3(state)
+    assert action == {"x": 4.0}
+    assert add3.input_keys == {"x", "theta"}
+    assert add3.effective_input_keys == {"x"}
+    assert add3.output_keys == {"x"}
+
 
 def test_train():
     def data_stream():
-        for i in range(20):
-            yield {"a": i}
-    add3 = AddNum(num=3)
+        for i in range(5):
+            yield {"x": i}
+
+    add3 = LinearOperation(intercept=3)
     env = Env(data_stream())
     train(add3, env)
 
+
 def test_pipeline_agent():
     def data_stream():
-        for i in range(20):
-            yield {"a": i}
-    add3 = AddNum(num=3)
-    add5 = AddNum(num=5)
+        for i in range(5):
+            yield {"x": i, "theta": 0.5}
+
+    add3 = LinearOperation(intercept=3)
+    add5 = LinearOperation(intercept=5)
     agent = PipelineAgent([add3, add5])
-    env = Env(data_stream())
+    env = Env(stream=data_stream())
     train(agent, env)
+    assert env.state["x"] == 7.5
 

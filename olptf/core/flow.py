@@ -47,73 +47,26 @@ def get_graph(agents, show_data_keys=True):
                         keys_from_state = (
                             current.effective_input_keys - commuted_data_keys
                         )
-                        keys_to_state = ag.output_keys - commuted_data_keys
                         if keys_from_state:
                             for k in deepcopy(keys_from_state):
                                 for _ag in reversed(queue):
                                     if k in _ag.output_keys:
-                                        # deal with ambiguity of inflowed data keys
-                                        if k in current.output_keys:
-                                            if not graph.has_edge(
-                                                _ag.label, f"[{k}]"
-                                            ) and not graph.has_edge(
-                                                _ag.label, f"[{k}](from {_ag.label})"
-                                            ):
-                                                graph.add_edge(
-                                                    _ag.label,
-                                                    f"[{k}](from {_ag.label})",
-                                                )
-                                            if not graph.has_edge(
-                                                f"[{k}]", current.label
-                                            ) and not graph.has_edge(
-                                                f"[{k}](from {_ag.label})",
-                                                current.label,
-                                            ):
-                                                graph.add_edge(
-                                                    f"[{k}](from {_ag.label})",
-                                                    current.label,
-                                                )
-                                        else:
-                                            graph.add_edge(_ag.label, f"[{k}]")
-                                            graph.add_edge(f"[{k}]", current.label)
                                         keys_from_state.remove(k)
-                            if keys_from_state:
-                                str_keys_from_state = f"[{','.join(keys_from_state)}]"
-                                if not graph.has_edge("state", str_keys_from_state):
-                                    graph.add_edge("state", str_keys_from_state)
-                                if not graph.has_edge(
-                                    str_keys_from_state, current.label
-                                ):
-                                    graph.add_edge(str_keys_from_state, current.label)
-                        if keys_to_state:
-                            str_keys_to_state = f"[{','.join(keys_to_state)}]"
-                            graph.add_edge(str_keys_to_state, "state")
-                            graph.add_edge(ag.label, str_keys_to_state)
+                        if keys_from_state:
+                            str_keys_from_state = f"[{','.join(keys_from_state)}]"
+                            graph.add_edge("state", str_keys_from_state)
+                            graph.add_edge(str_keys_from_state, current.label)
+                        # communicated data keys from ag to current
                         str_commuted_data_keys = f"[{','.join(commuted_data_keys)}]"
-                        # deal with ambiguity of inflowed data keys
                         if commuted_data_keys.issubset(current.output_keys):
-                            if not graph.has_edge(
-                                ag.label,
-                                str_commuted_data_keys,
-                            ) and not graph.has_edge(
+                            graph.add_edge(
                                 ag.label,
                                 str_commuted_data_keys + f"(from {ag.label})",
-                            ):
-                                graph.add_edge(
-                                    ag.label,
-                                    str_commuted_data_keys + f"(from {ag.label})",
-                                )
-                            if not graph.has_edge(
-                                str_commuted_data_keys,
-                                current.label,
-                            ) and not graph.has_edge(
+                            )
+                            graph.add_edge(
                                 str_commuted_data_keys + f"(from {ag.label})",
                                 current.label,
-                            ):
-                                graph.add_edge(
-                                    str_commuted_data_keys + f"(from {ag.label})",
-                                    current.label,
-                                )
+                            )
                         else:
                             graph.add_edge(ag.label, str_commuted_data_keys)
                             graph.add_edge(str_commuted_data_keys, current.label)
@@ -132,15 +85,12 @@ def get_graph(agents, show_data_keys=True):
             if out.label not in outflowed:
                 keys = out.output_keys
                 str_keys = f"[{','.join(keys)}]"
-            if keys.issubset(out.effective_input_keys):
-                if not graph.has_edge(
-                    str_keys + f"(from {out.label})", "state"
-                ) and not graph.has_edge(str_keys, "state"):
+                if keys.issubset(out.effective_input_keys):
                     graph.add_edge(str_keys + f"(from {out.label})", "state")
-                if not graph.has_edge(
-                    out.label, str_keys + f"(from {out.label})"
-                ) and not graph.has_edge(out.label, str_keys):
                     graph.add_edge(out.label, str_keys + f"(from {out.label})")
+                else:
+                    graph.add_edge(str_keys, "state")
+                    graph.add_edge(out.label, str_keys)
     else:
         for root in agents:
             if root.label not in inflowed:
@@ -161,3 +111,4 @@ def viz_flow(pipline_agent, show_data_keys=True, ascii_only=False):
     """
     graph = get_graph(pipline_agent.agents, show_data_keys=show_data_keys)
     nx.write_network_text(graph, ascii_only=ascii_only)
+

@@ -17,24 +17,25 @@ class Agent(AbstractAgent):
         self._label = self.__repr__()
         self.update_attrs()
 
-    def __init_subclass__(cls, keys=None, **kwargs):
-        """allow input_keys initialization when creating the class.
+    def __init_subclass__(cls, keys: list or set = None, **kwargs):
+        """initialization of input_keys when creating the class.
 
         Args:
-            keys (list or set, optional): input_keys of Agent. Defaults to None.
+            keys (list or set): keys
+            kwargs:
         """
         super().__init_subclass__(**kwargs)
         if keys is not None:
             cls.input_keys = set(keys)
 
-    def __call__(self, state):
-        """warpper of observe and action.
+    def __call__(self, state: dict) -> dict:
+        """wrapper of observe and act.
 
         Args:
-            state (dict): state of the env.
+            state (dict): state
 
         Returns:
-            action (dict): action dict.
+            dict:
         """
         if state is not None:
             self.obs = state
@@ -118,6 +119,7 @@ class PipelineAgent(Agent):
             self.input_keys.update(agent_.input_keys)
 
     def flatten_agents(self):
+        """flatten agents in self.agents."""
         _agents = list()
         for agent in self.agents:
             if hasattr(agent, "agents"):
@@ -128,7 +130,12 @@ class PipelineAgent(Agent):
                 _agents.append(agent)
         self.agents = _agents
 
-    def act(self):
+    def act(self) -> dict:
+        """action of a sequence of agents.
+
+        output of former Agent only updates self.obs,
+        and can be used by following agents.
+        """
         actions = dict()
         for agent in self.agents:
             action = agent(self.obs)
@@ -174,7 +181,7 @@ class Env(AbstractEnv):
 
 
 # online dynamic
-def train(agent, env):
+def train(agent: Agent or PipelineAgent, env: Env):
     done = False
     while not done:
         state, done = env.step()
@@ -193,3 +200,4 @@ def save(obj, path):
 
 def load(path):
     pickle.load(open(path, "rb"))
+

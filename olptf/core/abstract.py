@@ -73,3 +73,4 @@ class AbstractEnv(Base):
     @abstractmethod
     def interaction(self):
         ...
+
