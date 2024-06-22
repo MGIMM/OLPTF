@@ -1,7 +1,6 @@
 import os
 import pickle
 from dataclasses import dataclass
-from typing import List, Dict
 from collections.abc import Iterable
 from .abstract import AbstractAgent, AbstractEnv
 
@@ -35,19 +34,20 @@ class Agent(AbstractAgent):
             state (dict): state
 
         Returns:
-            dict:
+            dict: action
         """
         if state is not None:
+            # only entries in self.input_keys are loaded, c.f. setter of self.obs
             self.obs = state
             action = self.act()
         else:
             action = None
         if action is not None:
-            assert isinstance(action, dict), f"action of {self.label} should be a dict."
+            assert isinstance(action, dict), f"action of {self.label} should be dict."
             self.output_keys = set(action.keys())
         return action
 
-    def act(self) -> Dict:
+    def act(self) -> dict:
         ...
 
     @property
@@ -90,10 +90,8 @@ class Agent(AbstractAgent):
     @obs.setter
     def obs(self, state):
         self.effective_input_keys = set()
-        assert isinstance(state, dict), "state should be a dict."
-        for k in self.input_keys:
-            if k in state.keys():
-                self.effective_input_keys.update({k})
+        assert isinstance(state, dict), "state should be dict."
+        self.effective_input_keys = self.input_keys.intersection(state.keys())
         self._obs.update({k: state[k] for k in self.effective_input_keys})
         self.update_attrs()
 
@@ -103,17 +101,19 @@ class Agent(AbstractAgent):
 
     @label.setter
     def label(self, label):
-        assert isinstance(label, str), "label should be a str."
+        assert isinstance(label, str), "label should be str."
         self._label = label
 
 
 @dataclass
 class PipelineAgent(Agent):
-    agents: List
+    agents: list
+    flatten: bool = True
 
     def __post_init__(self):
         super().__post_init__()
-        self.flatten_agents()
+        if self.flatten:
+            self.flatten_agents()
         self.input_keys = set()
         for agent_ in self.agents:
             self.input_keys.update(agent_.input_keys)
@@ -148,7 +148,7 @@ class PipelineAgent(Agent):
 @dataclass
 class Env(AbstractEnv):
     stream: Iterable = None
-    init_state: Dict = None
+    init_state: dict = None
 
     def __post_init__(self):
         super().__post_init__()

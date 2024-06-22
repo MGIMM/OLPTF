@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict
 
 BASE_SKIP_FIELDS = [
     "abc_impl",
@@ -34,12 +33,12 @@ class Base(ABC):
 @dataclass
 class AbstractAgent(Base):
     @abstractmethod
-    def __call__(self, obs: Dict) -> Dict:
+    def __call__(self, obs: dict) -> dict:
         """wrapper: obs -> agent -> action"""
         ...
 
     @abstractmethod
-    def act(self) -> Dict:
+    def act(self) -> dict:
         """self.obs -> action"""
         ...
 
@@ -58,11 +57,11 @@ class AbstractAgent(Base):
 @dataclass
 class AbstractEnv(Base):
     @abstractmethod
-    def update_stream(self) -> Dict:
+    def update_stream(self) -> dict:
         ...
 
     @abstractmethod
-    def step(self) -> Dict:
+    def step(self) -> dict:
         ...
 
     @property
