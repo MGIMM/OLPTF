@@ -50,4 +50,3 @@ def test_pipeline_agent():
     env = Env(stream=data_stream())
     train(agent, env)
     assert env.state["x"] == 7.5
-

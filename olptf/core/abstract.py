@@ -44,8 +44,7 @@ class AbstractAgent(Base):
 
     @property
     @abstractmethod
-    def obs(self):
-        ...
+    def obs(self): ...
 
     @property
     @abstractmethod
@@ -57,19 +56,14 @@ class AbstractAgent(Base):
 @dataclass
 class AbstractEnv(Base):
     @abstractmethod
-    def update_stream(self) -> dict:
-        ...
+    def update_stream(self) -> dict: ...
 
     @abstractmethod
-    def step(self) -> dict:
-        ...
+    def step(self) -> dict: ...
 
     @property
     @abstractmethod
-    def state(self):
-        ...
+    def state(self): ...
 
     @abstractmethod
-    def interaction(self):
-        ...
-
+    def interaction(self): ...

@@ -21,7 +21,6 @@ class Agent(AbstractAgent):
 
         Args:
             keys (list or set): keys
-            kwargs:
         """
         super().__init_subclass__(**kwargs)
         if keys is not None:
@@ -47,8 +46,7 @@ class Agent(AbstractAgent):
             self.output_keys = set(action.keys())
         return action
 
-    def act(self) -> dict:
-        ...
+    def act(self) -> dict: ...
 
     @property
     def input_keys(self):
@@ -200,4 +198,3 @@ def save(obj, path):
 
 def load(path):
     pickle.load(open(path, "rb"))
-
