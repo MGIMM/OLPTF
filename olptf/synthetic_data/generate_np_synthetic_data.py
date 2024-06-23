@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
-from jax import grad, jit, vmap
-from jax import random
+import numpy.random as random
 
 
-def generate_jnp_risk_model(key, n_features, n_factors, sigma=None):
+def generate_np_risk_model(n_features, n_factors, sigma=None):
     """Generate factor risk model according to:
     cov = FF' + D
 
@@ -23,46 +21,42 @@ def generate_jnp_risk_model(key, n_features, n_factors, sigma=None):
     K = n_factors
 
     if K == 0:
-        F = jnp.zeros((N, 0))
+        F = np.zeros((N, 0))
     else:
-        key, subkey = random.split(key)
-        F = random.normal(key=subkey, shape=(N, K))
+        F = random.normal(size=(N, K))
         # orthogonalize and normalize
-        F = jnp.linalg.svd(F)[0][:, :K]
+        F = np.linalg.svd(F)[0][:, :K]
         if K >= 1:
-            F = F.at[:, 0].set(F[:, 0] * jnp.sqrt(10))
+            F[:, 0] *= np.sqrt(10)
         if K >= 2:
-            F = F.at[:, 1].set(F[:, 1] * jnp.sqrt(5))
-    D = jnp.ones(N)
+            F[:, 1] *= np.sqrt(5)
+    D = np.ones(N)
 
     if sigma:
-        cov = F @ F.T + jnp.diag(D)
-        vol = jnp.sqrt(jnp.diag(cov))
+        cov = F @ F.T + np.diag(D)
+        vol = np.sqrt(np.diag(cov))
         D = D / vol**2 * sigma**2
         F = F / vol[:, None] * sigma
     return F, D
 
 
 def generate_predictor(
-    key,
     T,
     N,
     time_scale,
 ):
-    key, subkey = random.split(key)
-    predictor = random.normal(key=subkey, shape=(T, N))
+    predictor = random.normal(size=(T, N))
     rho = 1.0 - 1.0 / time_scale
-    factor_ = jnp.sqrt(1.0 - rho**2) / (1.0 - rho)
-    predictor = predictor.at[1:, :].set(predictor[1:, :] * factor_)
-    # TODO: use jnp backend
+    factor_ = np.sqrt(1.0 - rho**2) / (1.0 - rho)
+    predictor[1:, :] *= factor_
+    # TODO: use np backend
     predictor = (
         pd.DataFrame(predictor).ewm(alpha=1.0 / time_scale, adjust=False).mean().values
     )
-    return jnp.asarray(predictor)
+    return np.asarray(predictor)
 
 
-def generate_dict_of_jnp(
-    key,
+def generate_dict_of_np(
     T=500,
     N=100,
     K=2,
@@ -78,7 +72,6 @@ def generate_dict_of_jnp(
     r = beta p + eps
 
     Args:
-        key (jax random key): jax random key.
         T (int, optional): number of days. Defaults to 500.
         N (int, optional): number of instruments. Defaults to 100.
         K (int, optional): number of factors in risk model. Defaults to 2.
@@ -95,32 +88,22 @@ def generate_dict_of_jnp(
 
     """
     assert K <= N, "invalid factor numbers!"
-    key, subkey = random.split(key)
-    F, D = generate_jnp_risk_model(key=subkey, n_factors=K, n_features=N, sigma=sigma)
-    cov = F @ F.T + jnp.diag(D)
+    F, D = generate_np_risk_model(n_factors=K, n_features=N, sigma=sigma)
+    cov = F @ F.T + np.diag(D)
     # use np for linalg for float64 precision
-    key, subkey = random.split(key)
-    noise_rets = random.normal(key=subkey, shape=(T, N)).dot(jnp.linalg.cholesky(cov).T)
+    noise_rets = random.normal(size=(T, N)).dot(np.linalg.cholesky(cov).T)
 
     # generate cost data
     if turnover is None:
-        key, subkey = random.split(key)
-        turnover = jnp.power(
-            10, random.uniform(key=subkey, minval=6.0, maxval=9.0, shape=(N,))
-        )
+        turnover = np.power(10, random.uniform(low=6.0, high=9.0, size=(N,)))
 
-    vol = jnp.sqrt(cov.diagonal())
-    gamma = 3.0
-    quad_cost = gamma * vol / turnover
+    vol = np.sqrt(cov.diagonal())
 
     if predictor is None:
         assert (
             time_scale_predictor is not None
         ), "please provide time_scale_predictor or predictor!"
-        key, subkey = random.split(key)
-        predictor = generate_predictor(
-            key=subkey, T=T, N=N, time_scale=time_scale_predictor
-        )
+        predictor = generate_predictor(T=T, N=N, time_scale=time_scale_predictor)
     else:
         assert predictor.shape == (T, N), f"predictor should be of shape ({T},{N})."
 
@@ -129,21 +112,35 @@ def generate_dict_of_jnp(
         # # norm_predictor_daily == False
         cov_pred = predictor.T @ predictor / len(predictor)
         norm_pred = np.sqrt(np.trace(np.linalg.inv(cov) @ cov_pred))
-        # norm_pred = jnp.sqrt((predictor * predictor.dot(jnp.linalg.inv(cov))).sum(1)).reshape(-1,1)
+        # norm_pred = np.sqrt((predictor * predictor.dot(np.linalg.inv(cov))).sum(1)).reshape(-1,1)
 
         assert sharpe is not None, "please provide sharpe or beta."
         daily_sharpe = sharpe / np.sqrt(252.0)
         beta = daily_sharpe / norm_pred
     else:
         assert sharpe is None, "sharpe and beta cannot be both specified."
-    if jnp.isscalar(beta):
-        beta = jnp.tile(beta, N)
+    if np.isscalar(beta):
+        beta = np.tile(beta, N)
 
     rets = beta * predictor + noise_rets
 
     aum = 1e9
+    eqt_codes = np.array(["eqt" + str(i) for i in range(N)])
 
     dates = pd.date_range("19000101", periods=T, freq="B")
+    mask = random.uniform(size=(T, N))
+    mask = pd.DataFrame(mask, index=dates, columns=eqt_codes)
+    mask = mask.ewm(100).mean() > 0.5
+
+    # put mask on every thing
+    predictor = pd.DataFrame(predictor, index=dates, columns=eqt_codes)
+    predictor[~mask] = np.nan
+
+    eigen_codes = np.array(["eigen" + str(i) for i in range(K)])
+    # risk model is unmasked
+    F = pd.DataFrame(F, index=eqt_codes, columns=eigen_codes)
+    D = pd.Series(D, index=eqt_codes)
+    vol = pd.Series(vol, index=eqt_codes)
 
     data = {
         "dates": dates,
@@ -151,11 +148,11 @@ def generate_dict_of_jnp(
         "covariance_factors": F,
         "residual_variance": D,
         "predictor": predictor,
-        "quad_cost": quad_cost,
         "turnover": turnover,
         "rets": rets,
         "beta": beta,
         "aum": aum,
+        "mask": mask,
     }
 
     if linear_cost is not None:
