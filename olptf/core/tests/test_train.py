@@ -5,6 +5,7 @@ from ..concrete import (
     train,
 )
 from dataclasses import dataclass
+import time
 
 
 @dataclass
@@ -50,3 +51,12 @@ def test_pipeline_agent():
     env = Env(stream=data_stream())
     train(agent, env)
     assert env.state["x"] == 7.5
+
+
+def test_log():
+    add3 = LinearOperation(intercept=3)
+    state = {"x": 1.0}
+    action = add3(state)
+    state = {"x": 2.0}
+    action = add3(state)
+    assert len(add3.log["run_time"]) == 2

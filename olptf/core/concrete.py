@@ -1,4 +1,5 @@
 import os
+import time
 import pickle
 from dataclasses import dataclass
 from collections.abc import Iterable
@@ -14,6 +15,9 @@ class Agent(AbstractAgent):
         self._effective_input_keys = set()
         self._output_keys = set()
         self._label = self.__repr__()
+        self._log = dict()
+        self._runtime_counter = 0
+        self._time_id = None
         self.update_attrs()
 
     def __init_subclass__(cls, keys: list or set = None, **kwargs):
@@ -37,12 +41,24 @@ class Agent(AbstractAgent):
         """
         if state is not None:
             # only entries in self.input_keys are loaded, c.f. setter of self.obs
+            lt = time.localtime()
+            self._time_id = (
+                f"id-{self._runtime_counter}-{lt.tm_hour}:{lt.tm_min}:{lt.tm_sec}"
+            )
+            t_start = time.time()
+
             self.obs = state
             action = self.act()
+
+            run_time = time.time() - t_start
+            self.log = {"run_time": {time_id: run_time}}
+            self._runtime_counter += 1
         else:
             action = None
         if action is not None:
-            assert isinstance(action, dict), f"action of {self.label} should be dict."
+            assert isinstance(
+                action, dict
+            ), f"action of {self.label} should be dict or None."
             self.output_keys = set(action.keys())
         return action
 
@@ -101,6 +117,19 @@ class Agent(AbstractAgent):
     def label(self, label):
         assert isinstance(label, str), "label should be str."
         self._label = label
+
+    @property
+    def log(self):
+        return self._log
+
+    @log.setter
+    def log(self, info):
+        for field, info_dict in info.items():
+            try:
+                self._log[field].update(info_dict)
+            except KeyError:
+                self._log[field] = dict()
+                self._log[field].update(info_dict)
 
 
 @dataclass
