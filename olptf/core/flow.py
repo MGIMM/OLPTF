@@ -44,7 +44,7 @@ def get_graph(agents, show_data_keys=True):
                     inflowed.update({current.label})
                     outflowed.update({ag.label})
                     if show_data_keys:
-                        keys_from_state = (
+                        keys_from_state = sorted(
                             current.effective_input_keys - commuted_data_keys
                         )
                         if keys_from_state:
@@ -57,7 +57,9 @@ def get_graph(agents, show_data_keys=True):
                             graph.add_edge("state", str_keys_from_state)
                             graph.add_edge(str_keys_from_state, current.label)
                         # communicated data keys from ag to current
-                        str_commuted_data_keys = f"[{','.join(commuted_data_keys)}]"
+                        str_commuted_data_keys = (
+                            f"[{','.join(sorted(commuted_data_keys))}]"
+                        )
                         if commuted_data_keys.issubset(current.output_keys):
                             graph.add_edge(
                                 ag.label,
@@ -78,13 +80,13 @@ def get_graph(agents, show_data_keys=True):
         for root in agents:
             if root.label not in inflowed:
                 keys = root.effective_input_keys
-                str_keys = f"[{','.join(keys)}]"
+                str_keys = f"[{','.join(sorted(keys))}]"
                 graph.add_edge("state", str_keys)
                 graph.add_edge(str_keys, root.label)
         for out in agents:
             if out.label not in outflowed:
                 keys = out.output_keys
-                str_keys = f"[{','.join(keys)}]"
+                str_keys = f"[{','.join(sorted(keys))}]"
                 if keys.issubset(out.effective_input_keys):
                     graph.add_edge(str_keys + f"(from {out.label})", "state")
                     graph.add_edge(out.label, str_keys + f"(from {out.label})")
