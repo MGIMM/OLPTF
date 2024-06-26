@@ -51,7 +51,7 @@ class Agent(AbstractAgent):
             action = self.act()
 
             run_time = time.time() - t_start
-            self.log = {"run_time": {time_id: run_time}}
+            self.log = {"run_time": {self._time_id: run_time}}
             self._runtime_counter += 1
         else:
             action = None
