@@ -59,4 +59,4 @@ def test_log():
     action = add3(state)
     state = {"x": 2.0}
     action = add3(state)
-    assert len(add3.log["run_time"]) == 2
+    assert len(add3.log["runtime"]) == 2

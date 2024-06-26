@@ -40,18 +40,18 @@ class Agent(AbstractAgent):
             dict: action
         """
         if state is not None:
-            # only entries in self.input_keys are loaded, c.f. setter of self.obs
             lt = time.localtime()
             self._time_id = (
                 f"id-{self._runtime_counter}-{lt.tm_hour}:{lt.tm_min}:{lt.tm_sec}"
             )
             t_start = time.time()
 
+            # only entries in self.input_keys are loaded, c.f. setter of self.obs
             self.obs = state
             action = self.act()
 
-            run_time = time.time() - t_start
-            self.log = {"run_time": {self._time_id: run_time}}
+            runtime = time.time() - t_start
+            self.log = {"runtime": {self._time_id: runtime}}
             self._runtime_counter += 1
         else:
             action = None
