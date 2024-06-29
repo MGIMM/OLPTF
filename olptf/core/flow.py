@@ -1,5 +1,7 @@
 import networkx as nx
 from copy import deepcopy
+from .concrete import PipelineAgent, Agent
+from pandas import Series, DataFrame
 
 
 def _check_flow(_from, _to):
@@ -38,7 +40,7 @@ def get_graph(agents, show_data_keys=True):
         if not queue:
             queue.append(current)
         else:
-            for ag in queue:
+            for ag in reversed(queue):
                 commuted_data_keys = _check_flow(_from=ag, _to=current)
                 if commuted_data_keys:
                     inflowed.update({current.label})
@@ -49,7 +51,7 @@ def get_graph(agents, show_data_keys=True):
                         )
                         if keys_from_state:
                             for k in deepcopy(keys_from_state):
-                                for _ag in reversed(queue):
+                                for _ag in reversed(queue[:-1]):
                                     if k in _ag.output_keys:
                                         keys_from_state.remove(k)
                         if keys_from_state:
@@ -103,13 +105,24 @@ def get_graph(agents, show_data_keys=True):
     return graph
 
 
-def viz_flow(pipline_agent, show_data_keys=True, ascii_only=False):
+def viz_flow(agent, show_data_keys=True, ascii_only=False, verbose=True):
     """viz agent flow with quasi ascii style.
 
     Args:
-        pipline_agent (PipelineAgent): An executed PipeplineAgent object (with .agents attr and effective_input_keys/output_keys for all of them).
+        agent (Agent or PipelineAgent): An executed PipeplineAgent object (with .agents attr and effective_input_keys/output_keys for all of them).
         show_data_keys (bool, optional): whether to show data keys flow. Defaults to True.
         ascii_only (bool, optional): whether to use pure ascii output. Defaults to False.
+        verbose (bool, optional): whether to show runtime stats. Defaults to True.
     """
-    graph = get_graph(pipline_agent.agents, show_data_keys=show_data_keys)
+    if isinstance(agent, Agent):
+        agent = PipelineAgent(agents=[agent])
+    graph = get_graph(agent.agents, show_data_keys=show_data_keys)
     nx.write_network_text(graph, ascii_only=ascii_only)
+    if verbose:
+        runtime = dict()
+        for ag in agent.agents:
+            runtime[ag.label] = Series(ag.log["runtime"]).mean()
+        runtime = Series(runtime)
+        print(
+            f"---Average runtime:\n{runtime.to_string(float_format='{:,.3e}s'.format)}"
+        )

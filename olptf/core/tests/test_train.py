@@ -51,6 +51,9 @@ def test_pipeline_agent():
     env = Env(stream=data_stream())
     train(agent, env)
     assert env.state["x"] == 7.5
+    from olptf.core.flow import viz_flow
+    viz_flow(agent)
+
 
 
 def test_log():
